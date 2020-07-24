@@ -1,14 +1,14 @@
-library(Matrix)
-library(tictoc)
 
 ############this script tests whether 1000 symmetrical NxN normal(0,1) matrixes are positive-definite or not
 ##########elapsed time for the 1000 matrixes tests are computed
+library(Matrix)
+library(tictoc)
 
 
 ##symmetrical NxN data generation function
 gen_rnorm_sym_matrix <- function(N){
   normal_mat <- matrix(rnorm(N*N,mean=0,sd=1), N, N) 
-  normal_mat <- as.matrix(forceSymmetric(normal_mat))
+  normal_mat <- as.matrix(Matrix::forceSymmetric(normal_mat))
   return(normal_mat)
 }
 
@@ -18,8 +18,8 @@ gen_rnorm_sym_matrix <- function(N){
 #eigen(matrix)$values
 
 
-###prop: a symmetrical NxN matrix is pos.def. i.f.f det(all Leading Principal Minors) > 0. 
-##this alternative method is more efficient and scales not so bad as eigenvalues.
+###prop: a symmetrical NxN matrix is pos.def. i.f.f det(each Leading Principal Minor) > 0. 
+##this alternative method uses determinant, is more efficient and scales not so bad as eigenvalues.
 
 ##leading principal minor method for a matrix 
 LPMinors_det <- function(mat){
@@ -92,3 +92,5 @@ tic.log(format = T) #elapsed time log for each test
 
 #[[7]]
 #[1] "10000x10000: 5672.14 sec elapsed"
+
+#####we ran optimizations using a PC with 16gb ram, RX5700XT graphic card and amd ryzen 5 3600
