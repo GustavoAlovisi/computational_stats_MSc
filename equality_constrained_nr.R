@@ -19,13 +19,15 @@ results_f_penalty$estimate
 
 
 
+
 ####using classes constructed algorithm, with numerical hessian/gradient calculation:
 library(pracma) 
 
-fx <- function(x){
-  z <- x[1]^4 + x[2]^2 + 4*x[1]*x[2] + (x[1]^2 +x[2]^2 - 1)
+f_lambda_g <- function(x){
+  z <- x[1]^4 + x[2]^2 + 4*x[1]*x[2] - x[3]*(x[1]^2 +x[2]^2 - 1)
   return(z) 
 }
+
 
 newton_rhapson <- function(fun, set_tol, x0){
   tol <- 1
@@ -41,10 +43,10 @@ newton_rhapson <- function(fun, set_tol, x0){
   return(z)
 }
 
-results_f_penalty2 <- newton_rhapson(fun = fx, set_tol = 1e-15, x0 = c(10,10))
-round(results_f_penalty2[,ncol(results_f_penalty2)],6)
-#[1]  0.707107 -0.707107 = c(x1,x2)
-
+results_f_lambda_g <- newton_rhapson(fun = fx, set_tol = 1e-15, x0 = c(10,10, -5)) ##here we give an initial guess
+#for lambda as well  
+results_f_lambda_g[,ncol(results_f_lambda_g)]
+#[1]  0.7071068 -0.7071068 -1.0000000 = c(x,y, lambda)
 
 
 ####bonus: Using Rsolnp (Augmented Lagrange + SQP) with equality constraints that we define
@@ -73,4 +75,16 @@ results_auglag$pars
 ##that the obtained minimum points must be global minimum points because of Extreme Value Theorem.
 ##Hence, c(x1, y1) = (0.707107, -0.707107) and c(x2, y2) = (-0.707107, 0.707107) are both 
 ##Global Min. points. This suggests NR algorithm in this case is sensitive to starting points x0,
-##since different starting points can lead to one of the two global min. points. 
+##since different starting points can lead to one of the two global min. points. However, all algorithms converge
+##to a global minimum. 
+
+
+
+
+
+
+
+
+
+
+
