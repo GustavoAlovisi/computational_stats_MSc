@@ -18,8 +18,6 @@ results_f_penalty$estimate
 #[1] -0.7071068 -0.7071068 = c(x1, x2)
 
 
-
-
 ####using classes constructed algorithm, with numerical hessian/gradient calculation:
 library(pracma) 
 
@@ -27,7 +25,6 @@ f_lambda_g <- function(x){
   z <- x[1]^4 + x[2]^2 + 4*x[1]*x[2] - x[3]*(x[1]^2 +x[2]^2 - 1)
   return(z) 
 }
-
 
 newton_rhapson <- function(fun, set_tol, x0){
   tol <- 1
@@ -68,7 +65,6 @@ equality_const <- function(x){
 results_auglag <- Rsolnp::solnp(c(1000,1000), fun = f, eqfun = equality_const, eqB = c(1))
 results_auglag$pars
 #[1] -0.7071068  0.7071068 = c(x1,x2)
-
 
 
 ##Given the equality constrained problem on a closed and bounded set (unit circle), we know 

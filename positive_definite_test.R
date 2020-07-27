@@ -29,6 +29,14 @@ LPMinors_det <- function(mat){
   return(TRUE) #if every det > 0, matrix is pos.def. 
 }
 
+##########test: lets use our built function to test for a known pos.def. matrix: 
+posdefMat <- matrix(0,2,2)
+posdefMat[1,1] <- posdefMat[2,2] <- 5
+
+LPMinors_det(posdefMat)
+#TRUE
+
+#########now lets test simulated symmetrical normal matrixes: 
 posdefprop <- numeric(4) #initiating an array for proportion of pos.def. matrixes over 1000 matrixes generated 
 #for each case
 
