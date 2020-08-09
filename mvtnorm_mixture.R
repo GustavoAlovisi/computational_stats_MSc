@@ -1,99 +1,104 @@
 ######mvt normal copula mixtures
 
-
+set.seed(182)
 library(mvnfast)
-#mvtnorm::dmvnorm(x = normalmvtmix, mean = c(0,3,2))
+library(ggplot2)
+library(mvtnorm)
+
+######a) Vamos simular um conjunto de dados (V1,V2,V3) provenientes de duas misturas de normais multivariadas
+#(V1,V2,V3) = 0.7*mvtnorm(mu1, I) + 0.3*mvtnorm(mu2, I)
+#Onde mu1 = t(0,0,0) e mu2 = t(3,3,3)
 
 mu <- matrix(c(0,0,0,
-               3,3,3), ncol = 3, nrow =2, byrow =T)
+               3,3,3), ncol = 3, nrow =2, byrow =T) #matriz de medias
 
-covmat <- diag(3)
+covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
 
-weights <- c(0.7, 0.3)
+weights <- c(0.7, 0.3) #vetores de pesos da mistura
 w1 <- 0.7
 w2 <- 0.3
-N <- 4000
-normalmvtmix <- rmixn(n=4000, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
+N <- 4000  #tamanho da amostra a ser simulada
 
+#simulando uma mistura de normais multivariadas. retInd = T nos da um atributo que indica se o elemento (V1i, V2i, V3i)
+#veio da mistura 1 ou 2:
+normalmvtmix <- rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
+
+#plotando a marginal V1, podemos ver que de fato ela parece ser uma mistura de duas distribuicoes
 normalmvtmix1 <- as.data.frame(normalmvtmix)
-
 ggplot(normalmvtmix1, aes(x=V1)) + geom_density()
-#########
+normalmvtmix1 <- NULL
 
-library(mvtnorm)
-p1 <- 0.7
-p2 <- 0.3
 
-mvtmixLL_optim <- function(m,x){
-  m1 = m[1:3]
-  m2 = m[4:6]
-  #p1 = m[7] ##estimating weights too
-  #p2 = m[8] ##w2 
-  -sum(log(p1*mvtnorm::dmvnorm(x = x, mean = m1)+ p2*mvtnorm::dmvnorm(x = x, mean = m2)))
-}
+#####b) Vamos obter os parametros das misturas de normais utilizando o metodo de Simulated Annealing
+#problema: devemos obter um 'd' adequado para nosso algoritmo
 
-##################maximizing log-likelihoods using optim() and nelder mead
-#we use nelder-mead because it is a simple unconstrained optmization. If we had equality constraints on weights, 
-#we could use L-BFGS-B with two weights (p1, 1-p1) and bound p1 from 0 to 1
-optim(par = c(-1,-1,-1,4,4,4), fn = mvtmixLL_optim, x = normalmvtmix, method = 'Nelder-Mead')
-#sensivel ao ponto inicial! 
-
-#################using Simulated Annealing
-
+#defininindo a função de log-verossimilhança de nosso problema
 mvtmixLL <- function(m,x){
   m1 = m[1:3]
   m2 = m[4:6]
   #p1 = m[7] ##estimating weights too
   #p2 = m[8] ##w2 
-  sum(log(p1*mvtnorm::dmvnorm(x = x, mean = m1)+ p2*mvtnorm::dmvnorm(x = x, mean = m2)))
+  sum(log(w1*mvtnorm::dmvnorm(x = x, mean = m1)+ w2*mvtnorm::dmvnorm(x = x, mean = m2)))
+}
+
+##definindo a função de Simulated Anealing
+#através de testes realizados, d <- 0.1sqrt(temp) parece ser um bom valor para d neste problema. 
+#valores mais altos retornam piores resultados na otimização
+GMM_SA <- function(n.iter, y, x0){
+  teta <- matrix(NA, nrow = n.iter, ncol = length(x0))
+  teta[1,] <- x0
+  f.eval <- rep(0, n.iter)
+  f.eval[1] <- mvtmixLL(teta[1,], x = y)
+  for(i in 2:n.iter){
+    temp <- 1/log(i+1)
+    #temp <- 1/log(1+i) 
+    d <- 0.1*sqrt(temp)
+    e <-rnorm(6)*d #runif(6, -d, d)
+    te1 <- teta[(i-1),] + e
+    u <- runif(1)
+    prob <- min(exp((mvtmixLL(m = te1, x = y)-mvtmixLL(m = teta[(i-1),], x = y))/temp), 1)
+    print(prob)
+    teta[i,] <- (u<=prob)*te1+(u>prob)*teta[(i-1),]
+    f.eval[i] <- mvtmixLL(m = teta[i,], x = y)
+  }
+  #rnorm(6)*0.6
+  pos <- which.max(f.eval)
+  teta.ot <- teta[pos,]
+  return(teta.ot)
 }
 
 
-n.iter <- 500
-teta <- matrix(0,nrow=n.iter,ncol=6) ##6 parametros, 3 de cada mvt normal
-teta[1,] <- c(0,-1,-1, 4,-4,4) #initial guesses para a primeira iteração
-f.eval <- rep(0,n.iter)
-
-f.eval[1] <- mvtmixLL(teta[1,],x = normalmvtmix) #x = normalmvtmix
+x0 <- c(8,9,-1, 4,3,6) #initial guesses para a primeira iteração
+teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x0) #otimizando via SA
+teta_SA #analisando chutes inicias, podemos ver que os resultados para teta são bem proximos dos tetas reais apenas se o chute inicial for um bom chute
 
 
-for(i in 2:n.iter){
-  temp <- 1/log(i+1)
-  #temp <- 1/log(1+i) 
-  d <- 0.1*sqrt(temp)
-  e <-rnorm(6)*d #runif(6, -d, d)
-  te1 <- teta[(i-1),] + e
-  u <- runif(1)
-  prob <- min(exp((mvtmixLL(m = te1, x = normalmvtmix)-mvtmixLL(m = teta[(i-1),], x = normalmvtmix))/temp), 1)
-  print(prob)
-  teta[i,] <- (u<=prob)*te1+(u>prob)*teta[(i-1),]
-  f.eval[i] <- mvtmixLL(m = teta[i,], x = normalmvtmix)
-}
+#alternativamente, poderiamos ter feito Simulated Annealing utilizando optim:
+optim(par = c(8,9,-1, 4,3,6), fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))
+#com a funcao do optim, a otimizacao parece ser igualmente sensivel aos parametros iniciais 
 
-#rnorm(6)*0.6
-pos <- which.max(f.eval)
-teta.ot <- teta[pos,]
-teta.ot
 
-#alternativamente, poderiamos ter feito
-optim(par = c(-1,-1,-1,4,4,4), fn = mvtmixLL_optim, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30))
-#note que os resultados são bem parecidos: nosso 'd' parece ser o adequado. 
+#####c) Vamos agora derivar o algoritmo EM para o problema de k=2 misturas de normais multivariadas 
+#Vamos definir os passos E,M, o algoritmo e fazer algumas analises baseadas na clusterizacao que o algoritmo resulta
+#Note que no algoritmo, pi_i = E(Z_i | X_i, mu1, mu2) é a probabilidade de cada vetor X_i pertencer a mistura 1
+#Analogamente, 1 - pi_i é a probabilidade de cada X_i pertencer a mistura 2. 
+#Assim, ao realizarmos o cálculo de pi_i, i = 1..n, podemos classificar cada vetor de dados em relacao a qual mistura ele pertence. 
+#Como ao gerar as n observacoes do vetor, obtivemos tambem a qual mistura o dado real pertence, podemos determinar quais elementos
+#foram classificados de forma correta ou errada. 
 
 
 
-##############usando EM - vamos tambem classificar se cada ponto (vetor) pertence a N1 ou N2 
-
-##função do passo E. Poderiamos generalizar para k misturas.
+##função do passo E. Poderiamos generalizar para k misturas e pesos desconhecidos, de forma simples.
 expect_step <- function(o, y){
   o1 <- o[1:ncol(y)]
   o2 <- o[(ncol(y)+1):(2*ncol(y))]
-  r1 <- w1 * dmvnorm(x = y, mean = o1) / (w1 * dmvnorm(x = y, mean = o1) + w2 * dmvnorm(x = y, mean = o2))
-  r2 <- w2 * dmvnorm(x = y, mean = o2) / (w1 * dmvnorm(x = y, mean = o1) + w2 * dmvnorm(x = y, mean = o2))
+  r1 <- w1 * mvtnorm::dmvnorm(x = y, mean = o1) / (w1 * mvtnorm::dmvnorm(x = y, mean = o1) + w2 * mvtnorm::dmvnorm(x = y, mean = o2))
+  r2 <- w2 * mvtnorm::dmvnorm(x = y, mean = o2) / (w1 * mvtnorm::dmvnorm(x = y, mean = o1) + w2 * mvtnorm::dmvnorm(x = y, mean = o2))
   return(cbind(r1, r2))
 }
 
 
-##função do passo M. Poderiamos generalizar para k misturas. 
+##função do passo M. Poderiamos generalizar para k misturas e pesos desconhecidos. 
 max_step <- function(pi, y){
   teta1.n <- sum(pi[,1])
   teta2.n <- sum(pi[,2])
@@ -131,17 +136,20 @@ GMM_EM <- function(eps, nrep, Y, t0){
   return(list(t, pi))
 }
 
-t0 <- c(-1,-2,-1,6,6,4) ##chute inicial para os parâmetros da mistura. 
+t0 <- c(-8,-9,-1,6,6,4) ##chute inicial para os parâmetros da mistura. 
 
 EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = t0) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
-#podemos ver que para n=40 os resultados estimados são próximos dos parâmetros reais.
+round(theta_EM,3)
+#podemos ver que para n=40 os resultados estimados são relativamente próximos dos parâmetros reais.
 #Com aumento do tamanho da amostra, porém, a estimação fica cada vez mais próxima dos parâmetros reais. 
-
+#Tambem, o algoritmo eh robusto em relacao aos pontos iniciais, ao contrario de nossa implementacao via Sim. Annealing. 
 
 pi_EM <- EM_result[[2]] ##obtendo os Pi's para cada y_i. Como temos dois elementos da mistura, podemos usar uma regra de decisão 
-#em que se pi_k=1 >= 0.5, o vetor de obs. y_i pertence a mistura 1. se pi_k=1 <=0, o vetor pertece a mistura k=2. 
+#em que se pi_k=1 >= 0.5, o vetor de obs. y_i pertence a mistura 1. se pi_k=1 <=0, o vetor pertece a mistura 2. 
+round(head(pi_EM),3)
+
 
 ##vamos agora analisar a classificação feita pelo algoritmo EM em relação a classificação real que mvnfast::rmixn nos provê
 yi_classificado <- cbind(normalmvtmix, ifelse(pi_EM[,1] >= 0.5, 1, 2)) ##classificando y_i conforme pertencer a mistura 1 ou 2
@@ -156,23 +164,18 @@ sum(class_errada)
 #o calculo mostra uma porcentagem baixa de classificações erradas. Usando n=4000, cerca de 0,2% dos dados foram classificados de forma errada apenas
 
 
-
-
-
-
 ####Para visualizarmos melhor a classifcação, vamos considerar o caso de uma mistura de normais bivariadas: 
-library(ggplot2)
 library(dplyr)
 
-mu <- matrix(c(0,0,
+mu_bvt <- matrix(c(0,0,
                3,3), ncol = 2, nrow =2, byrow =T)
 
-covmat <- diag(2)
+covmat_bvt <- diag(2)
 
 weights <- c(0.7, 0.3)
 w1 <- 0.7
 w2 <- 0.3
-normalbvtmix <- mvnfast::rmixn(n=100, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
+normalbvtmix <- mvnfast::rmixn(n=100, mu = mu_bvt, sigma = list(covmat_bvt, covmat_bvt), w = weights, retInd = T)
 
 t0 <- c(0, -1, 2, 4) ##chute inicial
 
@@ -186,8 +189,8 @@ yi_classificado <- cbind(normalbvtmix, ifelse(pi_EM[,1] >= 0.5, 1, 2)) ##classif
 yi_classificado <- cbind(yi_classificado, attributes(normalbvtmix)$index)
 colnames(yi_classificado) <- c("Y1", "Y2", "Mist_Est", "Mist_Real")
 
-##visualizando nossa classificacao: 
-yi_classificado <- dplyr::as.tbl(yi_classificado)
+##visualizando nossa classificacao de dois clusters: 
+yi_classificado <- dplyr::as.tbl(as.data.frame(yi_classificado))
 ggplot(yi_classificado, aes(x = Y1, y = Y2, color = Mist_Est)) + geom_point()
 
 ##por ultimo, vamos visualizar quais pontos foram erroneamente classificados:
@@ -196,6 +199,41 @@ yi_classificado <- yi_classificado %>% mutate(Class_Errado = abs(Mist_Est - Mist
 ggplot(yi_classificado, aes(x = Y1, y = Y2, color = as.factor(Class_Errado))) + 
   geom_point() 
 
+
+
+
+#####d) Vamos utilizar optim() para resolver o mesmo problema.
+#Podemos utilizar o metodo de Simulated Annealing ('SANN') do optim como fizemos na letra b) 
+#Ou ainda Nelder-Mead uma vez que temos apenas uma otimizacao sem restrição da log-verossimilhanca. 
+#Nota: Ao utilizarmos pesos variaveis, eh necessario a restricao em que w1+w2 = 1. 
+#Desta forma, seria interessante usar 'L-BFGS-B' e limitar w1 entre 0 e 1. 
+#Com mais de 2 misturas, porem, devemos pensar em como restringir a soma dos pesos, penalizando a funcao de verossimilhanca
+#ou utilizando outro algoritmo como Augmented-Lagrange. 
+ 
+#########
+library(mvtnorm)
+
+optim(par = c(-8,-9,-1,4,4,9), fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))
+#sensivel ao ponto inicial! 
+
+optim(par = c(-8,-9,-1,4,4,9), fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))
+#sensivel
+
+
+#####e) Com a implementacao e teste dos três métodos de otimização (Sim. Ann, EM, Nelder-Mead), 
+#podemos observar que para nossos dados simulados, o método EM é o mais robusto em relação aos parâmetros iniciais,
+#ainda, com aumento da amostra, os parâmetros estimados se aproximam bastante dos parametros reais. 
+#O metodo de EM ainda nos fornece uma ferramenta capaz de classificar cada vetor de observações (i = 1..n) em relação a probabilidade
+#de pertencer em cada mistura. 
+#Os algoritmos de SA e Nelder-Mead oferecem bons resultados apenas se dermos bons chutes iniciais. 
+#Existe ainda a questao de ótimos locais em nosso problema. 
+#Para Nelder-Mead, com um determinado chute inicial [c(8,9,-3,4,4,9)], os parametros encontrados foram ~c(3,3,3,0,0,0) 
+#ao invés de c(0,0,0,3,3,3). Isto sugere que ele acabou convergindo para um otimo local. 
+#O mesmo acontece para Simulated Annealing e também para o algoritmo EM. 
+#Analisando a convergência, o método EM é drasticamente mais rápido. Em uma estimação, o algoritmo convergiu em 9 iterações. 
+#Com chutes iniciais mais proximos, ele chegou a convergir em 3 iterações. 
+#O método de Simulated Annealing acaba demorando mais que os outros para rodar todas as suas iterações.
+#Com Nelder-Mead, a convergência ocorreu entre 200 e 600 iterações, dependendo da precisão do chute inicial. 
 
 
 
