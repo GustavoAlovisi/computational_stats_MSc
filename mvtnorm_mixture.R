@@ -1,4 +1,4 @@
-######Mistura de Copulas Normais Multivariadas: otimização por EM, Sim. Annealing e Nelder-Mead.
+######Mistura de Copulas Normais Multivariadas: otimização por EM, Sim. Annealing e Nelder-Mead######
 
 set.seed(182)
 library(mvnfast)
@@ -7,21 +7,21 @@ library(mvtnorm)
 
 ######a) Vamos simular um conjunto de dados (V1,V2,V3) provenientes de duas misturas de normais multivariadas
 #(V1,V2,V3) = 0.7*mvtnorm(mu1, I) + 0.3*mvtnorm(mu2, I)
-#Onde mu1 = t(0,0,0) e mu2 = t(3,3,3)
+#Onde mu1 = t(0,0,0) e mu2 = t(3,3,3), I = matriz identidade 3x3
 
 mu <- matrix(c(0,0,0,
                3,3,3), ncol = 3, nrow =2, byrow =T) #matriz de medias
 
 covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
 
-weights <- c(0.7, 0.3) #vetores de pesos da mistura
+#pesos da mistura
 w1 <- 0.7
 w2 <- 0.3
 N <- 40  #tamanho da amostra a ser simulada
 
 #simulando uma mistura de normais multivariadas. retInd = T nos da um atributo que indica se o elemento (V1i, V2i, V3i)
 #veio da mistura 1 ou 2:
-normalmvtmix <- mvnfast::rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
+normalmvtmix <- mvnfast::rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = c(w1,w2), retInd = T)
 
 #plotando a marginal V1, podemos ver que de fato ela parece ser uma mistura de duas distribuicoes
 normalmvtmix1 <- as.data.frame(normalmvtmix)
@@ -181,21 +181,18 @@ sum(class_errada)
 library(dplyr)
 
 mu_bvt <- matrix(c(0,0,
-               3,3), ncol = 2, nrow =2, byrow =T)
+                   3,3), ncol = 2, nrow =2, byrow =T) #gerando uma mistura k=2 de normais bivariadas
 
 covmat_bvt <- diag(2)
 
-weights <- c(0.7, 0.3)
-w1 <- 0.7
-w2 <- 0.3
-normalbvtmix <- mvnfast::rmixn(n=100, mu = mu_bvt, sigma = list(covmat_bvt, covmat_bvt), w = weights, retInd = T)
+normalbvtmix <- mvnfast::rmixn(n=100, mu = mu_bvt, sigma = list(covmat_bvt, covmat_bvt), w = c(w1,w2), retInd = T)
 
 t0 <- c(0, -1, 2, 4) ##chute inicial
 
 EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalbvtmix, t0 = t0) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) 
-pi_EM <- EM_result[[2]]
+pi_EM <- EM_result[[2]] #salvando os pi's para realizar algumas análises visuais 
 
 yi_classificado <- 0
 yi_classificado <- cbind(normalbvtmix, ifelse(pi_EM[,1] >= 0.5, 1, 2)) ##classificando y_i conforme pertencer a mistura 1 ou 2
@@ -242,7 +239,7 @@ optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control
 #Para Nelder-Mead, com um determinado chute inicial [c(3, 4, 5,-1,-2,-6)], os parâmetros encontrados foram ~c(3,3,3,0,0,0) 
 #ao invés de c(0,0,0,3,3,3). Isto sugere que ele acabou convergindo para um otimo local. 
 #O mesmo acontece para Simulated Annealing e também para o algoritmo EM. 
-#Analisando a convergência, o método EM é drasticamente mais rápido. Em uma estimação com chute inicial ruim, o algoritmo convergiu em ~20 iterações. 
+#Analisando a convergência, o método EM é drasticamente mais rápido. Em uma estimação com chute inicial ruim, o algoritmo convergiu em ~7 iterações. 
 #Com chutes iniciais mais próximos, ele chegou a convergir em 3 iterações. 
 #O método de Simulated Annealing acaba demorando mais que os outros para rodar todas as suas iterações.
 #Com Nelder-Mead, a convergência ocorreu entre 200 e 600 iterações, dependendo da precisão do chute inicial. 
@@ -277,13 +274,14 @@ round(theta_EM,3)
 
 #Nelder-Mead
 optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
-#$par
 #[1] 11.733734894 11.775296159  0.021060133  0.265933067  0.282902967  0.007179512
 #sensivel ao ponto inicial
 
-#Podemos ver que quando as misturas possuem parametros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos.
+
+#Podemos ver que quando as misturas possuem parâmetros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos.
 #Ao utilizarmos chutes iniciais distantes, a estimação por EM foi consideravelmente melhor. 
 #Conforme o tamanho da amostra aumenta, a precisão da estimação do método também aumenta, o que não foi observado com clareza para Sim. Annealing e Nelder Mead neste caso. 
 #O problema de máximos locais também continua neste exemplo. Ao mudarmos os chutes iniciais, podemos ver que os algoritmos convergem para diferentes valores. 
-
+#Em relação ao tempo de convergência, o algoritmo EM passou a levar mais iterações para convergir, (~20) o que ainda é bastante baixo e consideravelmente mais rapido que os outros métodos. 
+#Com um bom chute, o método de Nelder-Mead convergiu em cerca de 500 iterações. 
 
