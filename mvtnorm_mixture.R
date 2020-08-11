@@ -39,7 +39,7 @@ mvtmixLL <- function(m,x){
   #p1 = m[7] ##estimating weights too
   #p2 = m[8] ##w2 
   sum(log(w1*mvtnorm::dmvnorm(x = x, mean = m1)+ w2*mvtnorm::dmvnorm(x = x, mean = m2)))
-}
+} #soma está positiva, devemos utilizar fnscale = -1 no optim() 
 
 ##definindo a função de Simulated Anealing
 #através de testes realizados, d <- 0.1sqrt(temp) parece ser um bom valor para d neste problema. 
@@ -151,7 +151,7 @@ GMM_EM <- function(eps, nrep, Y, t0){
 }
 
 
-EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x1) ##EM
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x0) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
 round(theta_EM,3)
@@ -175,7 +175,8 @@ head(yi_classificado)
 class_errada <- abs(yi_classificado[,"Mist_Est"] - yi_classificado[,"Mist_Real"])/N
 sum(class_errada)
 #o calculo mostra uma porcentagem baixa de classificações erradas. Usando n=4000, cerca de 0,2% dos dados foram classificados de forma errada apenas
-
+#atenção: existem problemas de métodos locais, e dependendo do chute inicial, existem casos em que a maximização resulta em 
+#um vetor estimado ~(3, 3, 3, 0, 0, 0) ao invés do contrário (0,0,0,3,3,3). Isto pode levar a classificação a produzir resultados errôneos. 
 
 ####Para visualizarmos melhor a classifcação, vamos considerar o caso de uma mistura de normais bivariadas: 
 library(dplyr)
@@ -279,7 +280,7 @@ optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control
 
 
 #Podemos ver que quando as misturas possuem parâmetros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos.
-#Ao utilizarmos chutes iniciais distantes, a estimação por EM foi consideravelmente melhor. 
+#Ao utilizarmos chutes iniciais distantes, a estimação por EM foi consideravelmente melhor para nossos dados especificos simulados. 
 #Conforme o tamanho da amostra aumenta, a precisão da estimação do método também aumenta, o que não foi observado com clareza para Sim. Annealing e Nelder Mead neste caso. 
 #O problema de máximos locais também continua neste exemplo. Ao mudarmos os chutes iniciais, podemos ver que os algoritmos convergem para diferentes valores. 
 #Em relação ao tempo de convergência, o algoritmo EM passou a levar mais iterações para convergir, (~20) o que ainda é bastante baixo e consideravelmente mais rapido que os outros métodos. 
