@@ -1,4 +1,4 @@
-######mvt normal copula mixtures
+######Mistura de Copulas Normais Multivariadas: otimização por EM, Sim. Annealing e Nelder-Mead.
 
 set.seed(182)
 library(mvnfast)
@@ -17,11 +17,11 @@ covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
 weights <- c(0.7, 0.3) #vetores de pesos da mistura
 w1 <- 0.7
 w2 <- 0.3
-N <- 4000  #tamanho da amostra a ser simulada
+N <- 40  #tamanho da amostra a ser simulada
 
 #simulando uma mistura de normais multivariadas. retInd = T nos da um atributo que indica se o elemento (V1i, V2i, V3i)
 #veio da mistura 1 ou 2:
-normalmvtmix <- rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
+normalmvtmix <- mvnfast::rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = weights, retInd = T)
 
 #plotando a marginal V1, podemos ver que de fato ela parece ser uma mistura de duas distribuicoes
 normalmvtmix1 <- as.data.frame(normalmvtmix)
@@ -57,7 +57,7 @@ GMM_SA <- function(n.iter, y, x0){
     te1 <- teta[(i-1),] + e
     u <- runif(1)
     prob <- min(exp((mvtmixLL(m = te1, x = y)-mvtmixLL(m = teta[(i-1),], x = y))/temp), 1)
-    print(prob)
+    #print(prob) #printar a probabilidade de aceitação para calibragem do algoritmo
     teta[i,] <- (u<=prob)*te1+(u>prob)*teta[(i-1),]
     f.eval[i] <- mvtmixLL(m = teta[i,], x = y)
   }
@@ -68,13 +68,27 @@ GMM_SA <- function(n.iter, y, x0){
 }
 
 
-x0 <- c(8,9,-1, 4,3,6) #initial guesses para a primeira iteração
+x0 <- c(-1, 1, 0, 4, 2, 8) #initial guesses para a primeira iteração
+x1 <- c(8, 9, -1, 4, 3, 6)
+
 teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x0) #otimizando via SA
-teta_SA #analisando chutes inicias, podemos ver que os resultados para teta são bem proximos dos tetas reais apenas se o chute inicial for um bom chute
+teta_SA
+#[1]  0.1239047  0.2901662 -0.1826373  3.0737463  2.8966653  3.2500398
+
+
+teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x1) #otimizando via SA
+teta_SA 
+#[1]  7.3154158  8.6761766 -2.3489667  0.8210402  0.9318625  0.687138
+##analisando chutes inicias, podemos ver que os resultados para teta são próximos dos tetas reais apenas se o chute inicial for um bom chute
+##para o Simulated Annealing neste caso. 
 
 
 #alternativamente, poderiamos ter feito Simulated Annealing utilizando optim:
-optim(par = c(8,9,-1, 4,3,6), fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))
+optim(par = x0, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))$par
+#[1]  0.09850878  0.37002510 -0.11494675  2.96382203  2.83863939  3.19747390
+
+optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))$par
+#[1] 9.2777542 9.0986352 0.2013623 0.8537164 0.9482063 0.7030627
 #com a funcao do optim, a otimizacao parece ser igualmente sensivel aos parametros iniciais 
 
 
@@ -136,9 +150,8 @@ GMM_EM <- function(eps, nrep, Y, t0){
   return(list(t, pi))
 }
 
-t0 <- c(-8,-9,-1,6,6,4) ##chute inicial para os parâmetros da mistura. 
 
-EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = t0) ##EM
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x1) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
 round(theta_EM,3)
@@ -204,38 +217,73 @@ ggplot(yi_classificado, aes(x = Y1, y = Y2, color = as.factor(Class_Errado))) +
 
 #####d) Vamos utilizar optim() para resolver o mesmo problema.
 #Podemos utilizar o metodo de Simulated Annealing ('SANN') do optim como fizemos na letra b) 
-#Ou ainda Nelder-Mead uma vez que temos apenas uma otimizacao sem restrição da log-verossimilhanca. 
-#Nota: Ao utilizarmos pesos variaveis, eh necessario a restricao em que w1+w2 = 1. 
+#Ou ainda Nelder-Mead uma vez que temos apenas uma otimização sem restrição da log-verossimilhança. 
+#Nota: Ao utilizarmos pesos variáveis, eh necessario a restrição em que w1+w2 = 1. 
 #Desta forma, seria interessante usar 'L-BFGS-B' e limitar w1 entre 0 e 1. 
-#Com mais de 2 misturas, porem, devemos pensar em como restringir a soma dos pesos, penalizando a funcao de verossimilhanca
+#Com mais de 2 misturas, porém, devemos pensar em como restringir a soma dos pesos, penalizando a função de verossimilhança
 #ou utilizando outro algoritmo como Augmented-Lagrange. 
- 
-#########
-library(mvtnorm)
 
-optim(par = c(-8,-9,-1,4,4,9), fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))
-#sensivel ao ponto inicial! 
+optim(par = x0, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
+#sensível ao ponto inicial! 
+#[1] 0.53246960 0.22688230 0.06694153 3.62802198 3.33742254 3.20681230
 
-optim(par = c(-8,-9,-1,4,4,9), fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))
-#sensivel
+optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
+#sensível ao ponto inicial! 
+#[1]  8.7926401 12.8008444  4.0747302  0.8426125  0.9472383  0.6966989
 
 
-#####e) Com a implementacao e teste dos três métodos de otimização (Sim. Ann, EM, Nelder-Mead), 
+#####e) Com a implementação e teste dos três métodos de otimização (Sim. Ann, EM, Nelder-Mead), 
 #podemos observar que para nossos dados simulados, o método EM é o mais robusto em relação aos parâmetros iniciais,
 #ainda, com aumento da amostra, os parâmetros estimados se aproximam bastante dos parametros reais. 
 #O metodo de EM ainda nos fornece uma ferramenta capaz de classificar cada vetor de observações (i = 1..n) em relação a probabilidade
 #de pertencer em cada mistura. 
 #Os algoritmos de SA e Nelder-Mead oferecem bons resultados apenas se dermos bons chutes iniciais. 
-#Existe ainda a questao de ótimos locais em nosso problema. 
-#Para Nelder-Mead, com um determinado chute inicial [c(8,9,-3,4,4,9)], os parametros encontrados foram ~c(3,3,3,0,0,0) 
+#Existe ainda a questão de ótimos locais em nosso problema. 
+#Para Nelder-Mead, com um determinado chute inicial [c(3, 4, 5,-1,-2,-6)], os parâmetros encontrados foram ~c(3,3,3,0,0,0) 
 #ao invés de c(0,0,0,3,3,3). Isto sugere que ele acabou convergindo para um otimo local. 
 #O mesmo acontece para Simulated Annealing e também para o algoritmo EM. 
-#Analisando a convergência, o método EM é drasticamente mais rápido. Em uma estimação, o algoritmo convergiu em 9 iterações. 
-#Com chutes iniciais mais proximos, ele chegou a convergir em 3 iterações. 
+#Analisando a convergência, o método EM é drasticamente mais rápido. Em uma estimação com chute inicial ruim, o algoritmo convergiu em ~20 iterações. 
+#Com chutes iniciais mais próximos, ele chegou a convergir em 3 iterações. 
 #O método de Simulated Annealing acaba demorando mais que os outros para rodar todas as suas iterações.
 #Com Nelder-Mead, a convergência ocorreu entre 200 e 600 iterações, dependendo da precisão do chute inicial. 
 
+#####f) Vamos agora realizar a mesma análise de e) porém com vetor de médias da segunda mistura mu2 = t(1,1,0)
+#gerando duas misturas com médias mais parecidas do que da primeira vez:
+
+mu <- matrix(c(0,0,0,
+               1,1,0), ncol = 3, nrow =2, byrow =T) #matriz de medias
+
+covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
+
+normalmvtmix <- mvnfast::rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = c(w1,w2), retInd = T)
+
+x1 <- c(-1, 1, 0, 4 ,2 ,8)#mesmos chutes iniciais de antes, para compararmos
+
+#Simulated Annealing
+teta_SA <- GMM_SA(n.iter = 1000, y = normalmvtmix, x0 = x1) #otimizando via SA
+teta_SA
+#[1]  7.78488771  8.79780235 -0.89209191  0.26988808  0.28823402  0.01122817
+
+#Optim Simulated Annealing
+optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))$par
+#[1] 14.140905244  3.708064862 -4.750182133  0.268029406  0.281554807  0.002570182
+
+#EM
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x1) ##EM
+theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
+round(theta_EM,3)
+#[1,] 0.522 0.566 -0.004 -0.311 -0.357 0.033
 
 
+#Nelder-Mead
+optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
+#$par
+#[1] 11.733734894 11.775296159  0.021060133  0.265933067  0.282902967  0.007179512
+#sensivel ao ponto inicial
+
+#Podemos ver que quando as misturas possuem parametros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos.
+#Ao utilizarmos chutes iniciais distantes, a estimação por EM foi consideravelmente melhor. 
+#Conforme o tamanho da amostra aumenta, a precisão da estimação do método também aumenta, o que não foi observado com clareza para Sim. Annealing e Nelder Mead neste caso. 
+#O problema de máximos locais também continua neste exemplo. Ao mudarmos os chutes iniciais, podemos ver que os algoritmos convergem para diferentes valores. 
 
 
