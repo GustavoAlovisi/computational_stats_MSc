@@ -36,7 +36,7 @@ hessf <- function(beta, xi, yi){ #hessian matrix of f wrt beta[1], beta[2]
 f <- function(beta, xi ,yi){
   res <- sum((yi - beta[1] * exp(beta[2] * xi))^2)
   attr(res, "gradient") <- gradf(beta, xi, yi)
-  #attr(res, 'hessian') <- hessf(beta, xi, yi)
+  attr(res, 'hessian') <- hessf(beta, xi, yi)
   return(res)
 }
 
@@ -47,8 +47,7 @@ opt_NR$estimate
 
 
 
-############resolvendo com gauss-newton: 
-
+############resolvendo com gauss-newton: vamos aproximar a Matriz Hessiana
 #residuos da regresão:
 r <- function(beta, xi, yi){
   res <- yi - beta[1]*exp(beta[2]*xi)
