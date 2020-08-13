@@ -10,17 +10,17 @@ library(mvtnorm)
 #Onde mu1 = t(0,0,0) e mu2 = t(3,3,3), I = matriz identidade 3x3
 
 mu <- matrix(c(0,0,0,
-               3,3,3), ncol = 3, nrow =2, byrow =T) #matriz de medias
+               3,3,3), ncol = 3, nrow =2, byrow =T) #matriz de medias (para esta função eh transposto)
 
 covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
 
-#pesos da mistura
+#pesos da mistura 
 w1 <- 0.7
 w2 <- 0.3
 N <- 40  #tamanho da amostra a ser simulada
 
 #simulando uma mistura de normais multivariadas. retInd = T nos da um atributo que indica se o elemento (V1i, V2i, V3i)
-#veio da mistura 1 ou 2:
+#veio da mistura 1 ou 2 que iremos utilizar para análises posteriores:
 normalmvtmix <- mvnfast::rmixn(n = N, mu = mu, sigma = list(covmat, covmat), w = c(w1,w2), retInd = T)
 
 #plotando a marginal V1, podemos ver que de fato ela parece ser uma mistura de duas distribuicoes
@@ -29,7 +29,7 @@ ggplot(normalmvtmix1, aes(x=V1)) + geom_density()
 normalmvtmix1 <- NULL
 
 
-#####b) Vamos obter os parametros das misturas de normais utilizando o metodo de Simulated Annealing
+#####b) Vamos obter os parâmetros das misturas de normais utilizando o metodo de Simulated Annealing
 #problema: devemos obter um 'd' adequado para nosso algoritmo
 
 #defininindo a função de log-verossimilhança de nosso problema
@@ -69,7 +69,7 @@ GMM_SA <- function(n.iter, y, x0){
 
 
 x0 <- c(-1, 1, 0, 4, 2, 8) #initial guesses para a primeira iteração
-x1 <- c(8, 9, -1, 4, 3, 6)
+x1 <- c(8, 9, -1, 4, 3, 6) #initial guess mais distante
 
 teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x0) #otimizando via SA
 teta_SA
@@ -89,79 +89,94 @@ optim(par = x0, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list
 
 optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))$par
 #[1] 9.2777542 9.0986352 0.2013623 0.8537164 0.9482063 0.7030627
-#com a funcao do optim, a otimizacao parece ser igualmente sensivel aos parametros iniciais 
+#com a funcao do optim, a otimizacao parece ser igualmente sensivel aos parametros iniciais. 
+#A simulação estocastica em algumas vezes rodando a otimização produziu valores bem proximos aos reais, e as vezes valores distantes.
 
 
 #####c) Vamos agora derivar o algoritmo EM para o problema de k=2 misturas de normais multivariadas 
-#Vamos definir os passos E,M, o algoritmo e fazer algumas analises baseadas na clusterizacao que o algoritmo resulta
+#Vamos definir os passos E,M, o algoritmo e fazer algumas análises baseadas na clusterização que o algoritmo resulta
 #Note que no algoritmo, pi_i = E(Z_i | X_i, mu1, mu2) é a probabilidade de cada vetor X_i pertencer a mistura 1
 #Analogamente, 1 - pi_i é a probabilidade de cada X_i pertencer a mistura 2. 
-#Assim, ao realizarmos o cálculo de pi_i, i = 1..n, podemos classificar cada vetor de dados em relacao a qual mistura ele pertence. 
-#Como ao gerar as n observacoes do vetor, obtivemos tambem a qual mistura o dado real pertence, podemos determinar quais elementos
+#Assim, ao realizarmos o cálculo de pi_i, i = 1..n, podemos classificar cada vetor de dados em relação a qual mistura ele pertence. 
+#Como ao gerar as 'n' observacoes do vetor da mistura, obtivemos tambem a qual mistura o dado real pertence, podemos determinar quais elementos
 #foram classificados de forma correta ou errada. 
 
 
 
-##função do passo E. Poderiamos generalizar para k misturas e pesos desconhecidos, de forma simples.
-expect_step <- function(o, y){
-  o1 <- o[1:ncol(y)]
-  o2 <- o[(ncol(y)+1):(2*ncol(y))]
+##função do passo E. Poderiamos generalizar para k misturas desconhecidas.
+#Note que o EM neste caso também está estimando os pesos das misturas que será utilizado posteriormente na g). 
+expect_step <- function(o, y, weights){
+  o1 <- o[1:ncol(y)] #salva parâmetros mu da primeira mistura 
+  o2 <- o[(ncol(y)+1):(2*ncol(y))] #salva parâmetros mu da segunda mistura
+  w1 <- weights[1] #salvando pesos 1 e 2
+  w2 <- weights[2]
   r1 <- w1 * mvtnorm::dmvnorm(x = y, mean = o1) / (w1 * mvtnorm::dmvnorm(x = y, mean = o1) + w2 * mvtnorm::dmvnorm(x = y, mean = o2))
   r2 <- w2 * mvtnorm::dmvnorm(x = y, mean = o2) / (w1 * mvtnorm::dmvnorm(x = y, mean = o1) + w2 * mvtnorm::dmvnorm(x = y, mean = o2))
   return(cbind(r1, r2))
 }
 
 
-##função do passo M. Poderiamos generalizar para k misturas e pesos desconhecidos. 
+##função do passo M. Poderiamos generalizar para k misturas desconhecidas. 
 max_step <- function(pi, y){
-  teta1.n <- sum(pi[,1])
-  teta2.n <- sum(pi[,2])
+  teta1.n <- sum(pi[,1])  #total alocado para a mistura 1
+  teta2.n <- sum(pi[,2])  #total alocado para a mistura 2
   tetak1 <- tetak2 <- c(rep(0, ncol(y)))
   
-  tetak1 <- sapply(1:ncol(y), function(i){
-    1/teta1.n * sum(pi[,1]*y[,i])
+  tetak1 <- sapply(1:ncol(y), function(i){ #estimando vetor de médias da mistura 1
+    1/teta1.n * sum(pi[,1]*y[,i]) 
   })
   
-  tetak2 <- sapply(1:ncol(y), function(i){
+  tetak2 <- sapply(1:ncol(y), function(i){ #estimando vetor de médias da mistura 2
     1/teta2.n * sum(pi[,2]*y[,i])
   })
-  return(c(tetak1, tetak2))
+  
+  w1 <- teta1.n/(teta1.n + teta2.n) #estimando o peso da mistura 1. Note que o peso da mistura 1 eh apenas o que foi alocado para a mistura 1/soma de tudo alocado
+  w2 <- teta2.n/(teta1.n + teta2.n) #estimando o peso da mistura 2
+  
+  return(list(c(tetak1, tetak2), c(w1,w2)))
 }
 
 ##função que realiza a estimação via algoritmo EM. 
-GMM_EM <- function(eps, nrep, Y, t0){
+GMM_EM <- function(eps, nrep, Y, t0, weights0){
   cc <- 1
   rep <- 1
   t <- matrix(ncol = 1000, nrow = 2*ncol(Y))
   t[,1] <- t0
   while(cc > eps & rep < nrep){
     #etapa E
-    pi <- expect_step(o = t0, y = Y)
+    pi <- expect_step(o = t0, y = Y, weights = weights0)
     
     #etapa M
-    t1 <- max_step(pi = pi, y = Y)
-    
+    max_res <- max_step(pi = pi, y = Y)
+    t1 <- max_res[[1]]
+    weights0 <- max_res[[2]]
     rep <- rep + 1
     cc <- sum((t0 - t1)^2)
     t0 <- t1
     t[,rep] <- t0
   }
   t <- t[, 1:rep] #salvando os valores de todos os passos realizados para analise do algoritmo excluindo NA
-  return(list(t, pi))
+  return(list(t, pi, weights0))
 }
 
+w0 <- c(0.4, 0.6) #chute inicial para os pesos das misturas
 
-EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x0) ##EM
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x0, weights0 = w0) ##EM
 
-theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
+theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's) em relação a todos os passos
 round(theta_EM,3)
 #podemos ver que para n=40 os resultados estimados são relativamente próximos dos parâmetros reais.
 #Com aumento do tamanho da amostra, porém, a estimação fica cada vez mais próxima dos parâmetros reais. 
 #Tambem, o algoritmo eh robusto em relacao aos pontos iniciais, ao contrario de nossa implementacao via Sim. Annealing. 
 
 pi_EM <- EM_result[[2]] ##obtendo os Pi's para cada y_i. Como temos dois elementos da mistura, podemos usar uma regra de decisão 
-#em que se pi_k=1 >= 0.5, o vetor de obs. y_i pertence a mistura 1. se pi_k=1 <=0, o vetor pertece a mistura 2. 
+#em que se pi_k=1 >= 0.5, o vetor de obs. y_i pertence a mistura 1. se pi_k=1 <0.5, o vetor pertece a mistura 2. 
 round(head(pi_EM),3)
+
+pesos_EM <- EM_result[[3]] ##obtendo os pesos estimados das misturas
+pesos_EM #para N=40, o peso estimado é proximo, mas a estimação melhora bastante conforme o tamanho da amostra aumenta 
+#em relação aos pesos, o algoritmo parece estimar bem independente do chute inicial para os mesmos.
+#[1] 0.6499474 0.3500526
 
 
 ##vamos agora analisar a classificação feita pelo algoritmo EM em relação a classificação real que mvnfast::rmixn nos provê
@@ -181,6 +196,8 @@ sum(class_errada)
 ####Para visualizarmos melhor a classifcação, vamos considerar o caso de uma mistura de normais bivariadas: 
 library(dplyr)
 
+w1 <- 0.7
+w2 <- 0.3
 mu_bvt <- matrix(c(0,0,
                    3,3), ncol = 2, nrow =2, byrow =T) #gerando uma mistura k=2 de normais bivariadas
 
@@ -189,26 +206,44 @@ covmat_bvt <- diag(2)
 normalbvtmix <- mvnfast::rmixn(n=100, mu = mu_bvt, sigma = list(covmat_bvt, covmat_bvt), w = c(w1,w2), retInd = T)
 
 t0 <- c(0, -1, 2, 4) ##chute inicial
-
-EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalbvtmix, t0 = t0) ##EM
+w0 <- c(0.5, 0.5)
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalbvtmix, t0 = t0, weights0 = w0) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) 
 pi_EM <- EM_result[[2]] #salvando os pi's para realizar algumas análises visuais 
+peso_EM <- EM_result[[3]] #salvando os pesos
 
 yi_classificado <- 0
 yi_classificado <- cbind(normalbvtmix, ifelse(pi_EM[,1] >= 0.5, 1, 2)) ##classificando y_i conforme pertencer a mistura 1 ou 2
 yi_classificado <- cbind(yi_classificado, attributes(normalbvtmix)$index)
 colnames(yi_classificado) <- c("Y1", "Y2", "Mist_Est", "Mist_Real")
 
-##visualizando nossa classificacao de dois clusters: 
+##visualizando nossa classificação de dois clusters: 
 yi_classificado <- dplyr::as.tbl(as.data.frame(yi_classificado))
 ggplot(yi_classificado, aes(x = Y1, y = Y2, color = Mist_Est)) + geom_point()
 
-##por ultimo, vamos visualizar quais pontos foram erroneamente classificados:
+######Vamos comparar a classificação de nosso algoritmo EM com a classificação de um pacote de misturas gaussianas (flexmix)
+#para checar se estamos de fato classificando corretamente:
+
+#install.packages('flexmix')
+#install.packages('ellipse')
+library(flexmix)
+fit_with_covariance <- flexmix(normalbvtmix ~ 1,
+                               k = 2, 
+                               model = FLXMCmvnorm(diag = T),
+                               control = list(tolerance = 1e-08, iter.max = 1000))
+
+plotEll(fit_with_covariance, data = normalbvtmix)
+###podemos ver que no caso da normal bivariada, a classificação parece ter sido muito parecida em ambos os casos.
+
+
+
+##por ultimo, vamos visualizar quais pontos foram erroneamente classificados por nosso algoritmo:
 yi_classificado <- yi_classificado %>% mutate(Class_Errado = abs(Mist_Est - Mist_Real))
 
 ggplot(yi_classificado, aes(x = Y1, y = Y2, color = as.factor(Class_Errado))) + 
   geom_point() 
+
 
 
 
@@ -221,10 +256,12 @@ ggplot(yi_classificado, aes(x = Y1, y = Y2, color = as.factor(Class_Errado))) +
 #Com mais de 2 misturas, porém, devemos pensar em como restringir a soma dos pesos, penalizando a função de verossimilhança
 #ou utilizando outro algoritmo como Augmented-Lagrange. 
 
+#chute inicial melhor:
 optim(par = x0, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
 #sensível ao ponto inicial! 
 #[1] 0.53246960 0.22688230 0.06694153 3.62802198 3.33742254 3.20681230
 
+#chute inicial pior:
 optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
 #sensível ao ponto inicial! 
 #[1]  8.7926401 12.8008444  4.0747302  0.8426125  0.9472383  0.6966989
@@ -267,11 +304,15 @@ optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list
 #[1] 14.140905244  3.708064862 -4.750182133  0.268029406  0.281554807  0.002570182
 
 #EM
-EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x1) ##EM
+w0 <- c(0.5, 0.5) #chute inicial dos pesos
+EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalmvtmix, t0 = x1, weights0 = w0) ##EM
 theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu's)
 round(theta_EM,3)
 #[1,] 0.522 0.566 -0.004 -0.311 -0.357 0.033
 
+#Note que neste caso o algoritmo EM rodou até a última repetição, apesar de fornecer uma estimação relativamente próxima dos parâmetros.
+#Assim, podemos aumentar o nrep para obter convergência. Aumentando para 300, o algoritmo convergiu em 180 passos.
+#Podemos ver que misturas com médias parecidas são mais difíceis de serem classificadas, ainda mais com poucas observações. 
 
 #Nelder-Mead
 optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control = list(fnscale = -1))$par
@@ -279,10 +320,40 @@ optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control
 #sensivel ao ponto inicial
 
 
-#Podemos ver que quando as misturas possuem parâmetros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos.
+#Podemos ver que quando as misturas possuem parâmetros parecidos, o algoritmo EM resulta em uma otimização melhor que os outros métodos, apeasr de convergir com bem mais passos.
 #Ao utilizarmos chutes iniciais distantes, a estimação por EM foi consideravelmente melhor para nossos dados especificos simulados. 
 #Conforme o tamanho da amostra aumenta, a precisão da estimação do método também aumenta, o que não foi observado com clareza para Sim. Annealing e Nelder Mead neste caso. 
 #O problema de máximos locais também continua neste exemplo. Ao mudarmos os chutes iniciais, podemos ver que os algoritmos convergem para diferentes valores. 
 #Em relação ao tempo de convergência, o algoritmo EM passou a levar mais iterações para convergir, (~20) o que ainda é bastante baixo e consideravelmente mais rapido que os outros métodos. 
 #Com um bom chute, o método de Nelder-Mead convergiu em cerca de 500 iterações. 
+
+
+
+####g) vamos usar nosso EM para classificar os dados genéticos em duas misturas normais multivariadas 
+dados_gen <- read.table('Dadosgeneticos.txt', header = T) #lendo os dados
+dados_gen <- as.tbl(as.data.frame(t(dados_gen))) #transformando em tbl 
+
+##vamos remover colunas que sao todas 0 
+ind <- sapply(dados_gen, function(x) sum(x == 0)) != nrow(dados_gen)
+dados_gen <- dados_gen[,ind]
+
+
+w0 <- c(0.5, 0.5) #chute inicial para a mistura
+x1 <- c(rep(-0.1, 78), rep(0.6, 78)) #chute inicial para as medias. Removendo as colunas de 0, temos 78 variaveis. 
+EM_result_gen <- GMM_EM(eps = 1e-8, nrep = 100, Y = dados_gen, t0 = x1, weights0 = w0)
+
+theta_EM_gen <- EM_result_gen[[1]] #estimação dos parâmetros 
+head(theta_EM_gen[,3])
+
+pi_EM_gen <- EM_result_gen[[2]] #estimação dos pi's (a qual mistura pertence)
+
+pesos_EM_gen <- EM_result_gen[[3]] #estimação dos pesos
+pesos_EM_gen
+#[1] 0.9993578202 0.0006421798
+#No caso deste exemplo, o algoritmo EM atribui peso ~1 para a primeira mistura. Ao checar a estimação dos parâmetros para cada mistura, podemos ver que eles são os mesmos.
+#Assim, o algoritmo EM rejeitou a hipótese de existir duas misturas (clusters) para os dados. 
+
+#O algoritmo K-means ao utilizar dois clusters foi capaz de diferenciar as populações europeias das americanas:
+kmeans(dados_gen, centers = 2)[1]
+
 
