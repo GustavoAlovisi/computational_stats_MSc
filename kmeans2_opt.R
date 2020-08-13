@@ -2,14 +2,9 @@
 
 library(tidyverse)
 
-#f_obj <- function(xi, mu, zi){ #mediax c2 mediax c1 mediay c2 mediay c1
-#  mu1 <- as.numeric(mu[seq(from = 2, to = 2*(ncol(data)-1), by = 2 )])
-#  mu2 <- as.numeric(mu[seq(from = 1, to = 2*(ncol(data)-1), by = 2 )])
-#  f <- sum(zi * (xi-mu1)^2) + sum((1-zi)*(xi - mu2)^2) #queremos minimizar esta função 
-#  return(f) #note que em cada chamada da função, f corresponderá apenas no primeiro ou segundo termo devido a zi ser 0 ou 1 (indicadora)
-#}
 
-f_obj <- function(xi, mu, zi){ #mediax c2 mediax c1 mediay c2 mediay c1
+
+f_obj <- function(xi, mu, zi){ #função objetivo a ser minimizada 
   mu1 <- as.numeric(mu[2, ])
   mu2 <- as.numeric(mu[1, ])
   f <- sum(zi * (xi-mu1)^2) + sum((1-zi)*(xi - mu2)^2) #queremos minimizar esta função 
@@ -22,16 +17,16 @@ opt_k2means <- function(data, mu){
   conv <- FALSE
   while(conv == FALSE & nrep < 1000){
     data_temp <- data
-    for(i in 1:nrow(data)){
+    for(i in 1:nrow(data)){ ########se f_i for menor com zi=1, este vetor de observações é assigned o cluster 1. Se f_i for menor com zi =0, este vetor é assignado ao cluster 2.
       if(f_obj(xi = data[i,-which(colnames(data)=='which_cl')], mu = mu, zi = 1) < f_obj(xi = data[i,-which(colnames(data)=='which_cl')], mu = mu, zi = 0)){
-        data[i,]$which_cl <- 1
+        data[i,]$which_cl <- 1 ##cluster 1 = m1
       } else{
         data[i,]$which_cl <- 0 ##0 =  cluster 2 = m2 
       }
     }
-    print('a')
-    mu <- data %>% group_by(which_cl) %>% summarise_all(mean) %>% select(-which_cl) # %>% pivot_wider(names_from = which_cl, values_from = -which_cl) #computando as medias de cada cluster
-    #note que ao derivarmos a f.obj em relacao aos vetores de medias m1 e m2, chegamos a conclusao que m1^ é a soma das observações pertencentes ao cluster 1 dividido por a quantidade 
+ #   print('a')
+    mu <- data %>% group_by(which_cl) %>% summarise_all(mean) %>% select(-which_cl) # #computando as medias de cada cluster
+    #Note que ao derivarmos a f.obj em relacao aos vetores de medias m1 e m2, chegamos a conclusao que m1^ é a soma das observações pertencentes ao cluster 1 dividido por a quantidade 
     #de observações presente no cluster 1. Para o m2^, vale a mesma ideia.
     
     if(dplyr::all_equal(data, data_temp) == T){ ##criterio de convergencia: a atualização dos clusters não resultou em nenhuma mudança nova que minimizasse a f. objetivo
