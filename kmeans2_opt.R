@@ -1,8 +1,9 @@
 ##############k means clustering k=2: otimização 
+#A otimização do k-means para 2 clusters pode ser realizada minimizando a função objetivo
+#f = sum(zi* (x1 - mu1)^2) + sum((1-zi)*(xi-mu2)^2)
+#Onde zi = 0 ou 1 tal que para cada f_i escolhemos zi que minimiza a função objetivo
 
 library(tidyverse)
-
-
 
 f_obj <- function(xi, mu, zi){ #função objetivo a ser minimizada 
   mu1 <- as.numeric(mu[2, ])
@@ -12,7 +13,7 @@ f_obj <- function(xi, mu, zi){ #função objetivo a ser minimizada
 }
 
 
-opt_k2means <- function(data, mu){
+opt_k2means <- function(data, mu){ ##função de otimização do kmeans
   nrep <- 1
   conv <- FALSE
   while(conv == FALSE & nrep < 1000){
@@ -47,9 +48,10 @@ y <- 0
 y[1:50] <- rnorm(50, -1, 1)
 y[51:100] <- rnorm(50, 3, 1)
 
-z <- 0
-z[1:50] <- rnorm(50, 10, 1)
-z[51:100] <- rnorm(50, -3, 1)
+#z <- 0  #para analisar casos multivariados. Para facilidade de visualização, vamos utilizar um caso bivariado
+#z[1:50] <- rnorm(50, 10, 1)
+#z[51:100] <- rnorm(50, -3, 1)
+
 data <- as.tbl(as.data.frame(cbind(x,y)))
  
 ###vamos usar um chute inicial para os centroides, que constituem em valores aleatorios amostrados de nossos dados
@@ -64,14 +66,17 @@ ggplot(data, aes(x = x, y = y)) + geom_point()
 
 ##otimizando com kmeans
 opt <- opt_k2means(data, mu = mu) ###k2 means clustering
-a <- opt[[1]] ###salvando os dados e seu cluster
-b <- opt[[2]] ###salvando o vetor de medias (centroides)
+dados_kmeans <- opt[[1]] ###salvando os dados e seu cluster
+centroides <- opt[[2]] ###salvando o vetor de medias (centroides)
+
+head(dados_kmeans) 
+head(centroides)
 
 ##visualizando a classificação
-ggplot(a, aes(x = x, y= y, color = which_cl)) + geom_point()
+ggplot(dados_kmeans, aes(x = x, y= y, color = which_cl)) + geom_point()
 
 ##vamos agora comparar nossa classificação com a classificação do kmeans():
 model <- kmeans(data[,1:2], centers = 2)
-data[,3] <- model$cluster
+data[,3] <- model$cluster #atualizando coluna de cluster de nossos dados simulados
 ggplot(data, aes(x=x, y=y, color = which_cl)) + geom_point()
-#podemos ver que ambas classifcações são muito parecidas
+#podemos ver pelo plot que ambas classifcações são muito parecidas
