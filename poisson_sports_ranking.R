@@ -2,14 +2,15 @@
 #This script fits a Poisson Ranking model to Brazilian soccer data. 
 #We define X_ij ~ poisson(lambda) where lambda = e(o_i - d_j) = expected goals from i against j on a match
 #Note that lambda is always > 0.
-#o_i is the ofensive power of team i. This is usually computed as average(goals from i)\average(goals from league) in soccer analysis.
+#o_i is the offensive power of team i. This is usually computed as average(goals from i)\average(goals from league) in soccer analysis.
 #d_i is the defensive power of team j. Usually computed as average(goals against j)\average(goals against league)
 #So, we will be bounding our parameters to be >= 0 even if lambda is always positive. 
+#(We could use unconstrained optimization here since lambda = e(o_i - d-j) is always positive)
 
 #Due to nature of this problem, log-likelihood function uses information from d_j to estimate o_i 
 #And information from o_i to estimate d_j
 #A typical approach to this kind of optimization is Block Relaxation, where first we optimize o_i, then d_j.
-#We also consider L-BFGS-B/optim and NR with inequality constraint. 
+#We also consider L-BFGS-B optim (bound parameters) and NR with inequality constraint. 
 
 set.seed(182)
 
@@ -47,7 +48,7 @@ n=20; #20 teams
 d = rep(1,20) #we set ofensive and defensive initial guess values as 1 
 o = rep(1,20)
 
-O = matrix(ncol=20,nrow=n) #to visualize algorithm, we construct a matrix were column = optization step
+O = matrix(ncol=20,nrow=n) #to visualize algorithm, we construct a matrix were column = optimization step
 D = matrix(ncol=20,nrow=n) #and row = team parameter
 O[,1] = o
 D[,1] = d
@@ -78,12 +79,12 @@ poisson_block_opt <- function(epslon, X, o, d, O, D){ #block optimization of X l
 
 
 
-results <- poisson_block_opt(epslon = 1e-15, X = X, o=o, d=d, O=O, D=D) #poisson sports ranking com block opt 
-#para jogos em Casa dos times
+results <- poisson_block_opt(epslon = 1e-15, X = X, o=o, d=d, O=O, D=D) #poisson sports ranking with block opt. 
+
 O_est_BO <- results[[1]] ##ofensive estimate
 D_est_BO <- results[[2]] ##defensive estimate
 
-O_est_BO <- O_est_BO[,3] ##getting the last step of optimization
+O_est_BO <- O_est_BO[,3] ##getting the last step of optimization 
 D_est_BO <- D_est_BO[,3]
 
 names(O_est_BO) <- names(D_est_BO) <- c("AMM","ATM","ATP","BAH","BOT","CEA","CHA","COR","CRU","FLA",
@@ -139,14 +140,14 @@ head(sort(O_est_LBFGSB)) #worst offensive teams
 #PAR      FLU      CEA      COR      SPT      AMM 
 #1.306286 1.574550 1.631709 1.685776 1.685776 1.832379
 
-head(sort(D_est_LBFGSB)) #worst deffensive teams
+head(sort(D_est_LBFGSB)) #worst defensive teams
 #SPT      VIT      FLU      CHA      PAR      BOT 
 #1.315856 1.341174 1.449387 1.478375 1.478375 1.538999 
 
 
 
 #Direct -loglikelihood minimization using Newton-Rapson 
-#There is no lambda*g(x) (equality constraint) but we need to positive-bound our parameters
+#There is no lambda*g(x) (equality constraint) but we will positive-bound our parameters
 ##########################################################
 
 #problem: we need to set inequality bounds on our parameters (>=0)
@@ -191,12 +192,12 @@ head(sort(D_est_NR))
 #now, lets compare the three methods
 library(tidyverse)
 
-##First, lets compare each team's 'absolute' score, being ofensive + defensive score for each method
-#Their sum of scores represent the 'absolute' rank of each team
+##First, lets compare each team's 'absolute' score, being offensive + defensive score for each method
+#Their sum of scores (o + d) represent the 'absolute' rank of the team
 OD_est3 <- matrix(0, 20, 3)
-OD_est3[,1] <- O_est_BO + D_est_BO
-OD_est3[,2] <- O_est_LBFGSB + D_est_LBFGSB
-OD_est3[,3] <- O_est_NR + D_est_NR
+OD_est3[,1] <- O_est_BO + D_est_BO  #block-opt score 
+OD_est3[,2] <- O_est_LBFGSB + D_est_LBFGSB #optim score
+OD_est3[,3] <- O_est_NR + D_est_NR #Newton-Raphson score
 OD_est3 <- as.data.frame(OD_est3)
 colnames(OD_est3) <- c("BO", 'LBFGSB','NR')
 OD_est3 <- OD_est3 %>% gather('Method', 'parvalue')
@@ -206,7 +207,7 @@ ggplot(OD_est3, aes(x = parvalue, color = Method, fill= Method)) + geom_density(
   geom_vline(data = median, aes(xintercept=mediana),
              linetype="dashed")
 
-#We can see the 3 methods produced different optimizations, where Block-Opt produced Ofensive+Defensive parameter
+#We can see the 3 methods produced different optimizations, where Block-Opt produced Offensive+Defensive parameter
 #distribution with lowest median, and L-BFGS-B produced O+D param. distr. with highest median. 
 #However, the three distributions seem to have a similar shape.
 #This is probably related to Identification issues on the optimization. 
@@ -215,7 +216,7 @@ ggplot(OD_est3, aes(x = parvalue, color = Method, fill= Method)) + geom_density(
 
 ###Lets now check for the 5 better teams in each method:
 
-tail(sort(O_est_BO + D_est_BO),5) ##sorting for defensive + ofensive power
+tail(sort(O_est_BO + D_est_BO),5) ##sorting for defensive + offensive power
 #     FLA      INT      ATP      GRE      PAL 
 #2.628609 2.793231 2.920629 3.290503 3.444654 
 
@@ -233,12 +234,16 @@ tail(sort(O_est_NR + D_est_NR),5)
 ###Now, lets compute lambda = expected goals from i against j 
 
 ##expected value of goals when ATP faces SPT:
+
+#Block opt
 exp(O_est_BO["ATP"] - D_est_BO["SPT"]) #lambda
 #3.352381 goals expected from ATP against SPT
 
+#optim
 exp(O_est_LBFGSB["ATP"] - D_est_LBFGSB["SPT"]) #lambda
 #3.35238
 
+#NR
 exp(O_est_NR["ATP"] - D_est_NR["SPT"]) #lambda
 #3.352392 
 
@@ -248,8 +253,8 @@ exp(O_est_NR["ATP"] - D_est_NR["SPT"]) #lambda
 #However, L-BFGS-B and Block Optimization can be thought of more natural approaches, since the derivation of 
 #log-likelihood function is straightforward. 
 #In Newton-Rapson log-lik function, we had to add a conditional statement to manually bound the parameters. 
-#In this case, we could see adding this condition wouldn't give us bad funtion values, but in more complicated functions
-#this could cause problems. Also, this makes analytical gradient/hessian calculation less intuitive. 
+#In this case, we could see adding this condition wouldn't give us bad function values, but in more complicated functions
+#this could cause problems. Also, this makes analytic gradient/hessian calculation less intuitive. 
 #If we were doing unbounded optimization on parameters (not bounding on >=0), we could just use Nelder-Mead on optim and also we wouldn't need to change likelihood function for Newton-Rhapson method.
 #Then, all three methods could be a good option. 
 

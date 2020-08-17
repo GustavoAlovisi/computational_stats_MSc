@@ -54,7 +54,7 @@ y[51:100] <- rnorm(50, 3, 1)
 
 data <- as.tbl(as.data.frame(cbind(x,y)))
  
-###vamos usar um chute inicial para os centroides, que constituem em valores aleatorios amostrados de nossos dados
+###vamos usar um chute inicial para os centroides, que constituem em valores iniciais amostrados de nossos dados
 m1 <- sample_n(data, 1) ###cluster 1 inicial
 m2 <- sample_n(data, 1) ###cluster 2 inicial
 mu <- rbind(m1, m2)

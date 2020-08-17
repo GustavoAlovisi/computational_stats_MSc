@@ -1,9 +1,9 @@
 ######Mistura de Copulas Normais Multivariadas: otimização por EM, Sim. Annealing e Nelder-Mead######
 
 set.seed(182)
-library(mvnfast)
+library(mvnfast) #library para simular misturas de normais multivariadas
 library(ggplot2)
-library(mvtnorm)
+library(mvtnorm) #library para densidade de normais multivariadas
 
 ######a) Vamos simular um conjunto de dados (V1,V2,V3) provenientes de duas misturas de normais multivariadas
 #(V1,V2,V3) = 0.7*mvtnorm(mu1, I) + 0.3*mvtnorm(mu2, I)
@@ -14,7 +14,7 @@ mu <- matrix(c(0,0,0,
 
 covmat <- diag(3) #a covariancia eh a matriz identidade (var 1 e cov 0)
 
-#pesos da mistura 
+#pesos da mistura  (arbitrários)
 w1 <- 0.7
 w2 <- 0.3
 N <- 40  #tamanho da amostra a ser simulada
@@ -69,14 +69,14 @@ GMM_SA <- function(n.iter, y, x0){
 
 
 x0 <- c(-1, 1, 0, 4, 2, 8) #initial guesses para a primeira iteração
-x1 <- c(8, 9, -1, 4, 3, 6) #initial guess mais distante
+x1 <- c(8, 9, -1, 4, 3, 6) #initial guess mais distante do valor real
 
 teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x0) #otimizando via SA
 teta_SA
 #[1]  0.1239047  0.2901662 -0.1826373  3.0737463  2.8966653  3.2500398
 
 
-teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x1) #otimizando via SA
+teta_SA <- GMM_SA(n.iter = 500, y = normalmvtmix, x0 = x1) #otimizando via SA, initial guess pior
 teta_SA 
 #[1]  7.3154158  8.6761766 -2.3489667  0.8210402  0.9318625  0.687138
 ##analisando chutes inicias, podemos ver que os resultados para teta são próximos dos tetas reais apenas se o chute inicial for um bom chute
@@ -89,8 +89,8 @@ optim(par = x0, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list
 
 optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'SANN', control = list(temp = 15, tmax = 30, fnscale = -1))$par
 #[1] 9.2777542 9.0986352 0.2013623 0.8537164 0.9482063 0.7030627
-#com a funcao do optim, a otimizacao parece ser igualmente sensivel aos parametros iniciais. 
-#A simulação estocastica em algumas vezes rodando a otimização produziu valores bem proximos aos reais, e as vezes valores distantes.
+#com a função do optim, a otimização parece ser igualmente sensível aos parâmetros iniciais. 
+#A simulação estocástica em algumas vezes rodando a otimização produziu valores bem próximos aos reais, e as vezes valores distantes.
 
 
 #####c) Vamos agora derivar o algoritmo EM para o problema de k=2 misturas de normais multivariadas 
@@ -167,15 +167,15 @@ theta_EM <- as.matrix(EM_result[[1]]) ##salvando os valores dos parâmetros (mu'
 round(theta_EM,3)
 #podemos ver que para n=40 os resultados estimados são relativamente próximos dos parâmetros reais.
 #Com aumento do tamanho da amostra, porém, a estimação fica cada vez mais próxima dos parâmetros reais. 
-#Tambem, o algoritmo eh robusto em relacao aos pontos iniciais, ao contrario de nossa implementacao via Sim. Annealing. 
+#Também, o algoritmo eh robusto em relação aos pontos iniciais, ao contrário de nossa implementação via Sim. Annealing. 
 
 pi_EM <- EM_result[[2]] ##obtendo os Pi's para cada y_i. Como temos dois elementos da mistura, podemos usar uma regra de decisão 
 #em que se pi_k=1 >= 0.5, o vetor de obs. y_i pertence a mistura 1. se pi_k=1 <0.5, o vetor pertece a mistura 2. 
 round(head(pi_EM),3)
 
 pesos_EM <- EM_result[[3]] ##obtendo os pesos estimados das misturas
-pesos_EM #para N=40, o peso estimado é proximo, mas a estimação melhora bastante conforme o tamanho da amostra aumenta 
-#em relação aos pesos, o algoritmo parece estimar bem independente do chute inicial para os mesmos.
+pesos_EM #para N=40, o peso estimado é próximo, mas a estimação melhora bastante conforme o tamanho da amostra aumenta 
+#O algoritmo também parece ser robusto em relação a proximidade do chute inicial para os mesmos.
 #[1] 0.6499474 0.3500526
 
 
@@ -203,10 +203,11 @@ mu_bvt <- matrix(c(0,0,
 
 covmat_bvt <- diag(2)
 
+#simulando uma mistura de normais bivariadas (para plot em 2d)
 normalbvtmix <- mvnfast::rmixn(n=100, mu = mu_bvt, sigma = list(covmat_bvt, covmat_bvt), w = c(w1,w2), retInd = T)
 
-t0 <- c(0, -1, 2, 4) ##chute inicial
-w0 <- c(0.5, 0.5)
+t0 <- c(0, -1, 2, 4) ##chute inicial dos parametros da mistura
+w0 <- c(0.5, 0.5)  ##chute inicial dos pesos da mistura
 EM_result <- GMM_EM(eps = 1e-8, nrep = 100, Y = normalbvtmix, t0 = t0, weights0 = w0) ##EM
 
 theta_EM <- as.matrix(EM_result[[1]]) 
@@ -331,7 +332,7 @@ optim(par = x1, fn = mvtmixLL, x = normalmvtmix, method = 'Nelder-Mead', control
 
 ####g) vamos usar nosso EM para classificar os dados genéticos em duas misturas normais multivariadas 
 dados_gen <- read.table('Dadosgeneticos.txt', header = T) #lendo os dados
-dados_gen <- as.tbl(as.data.frame(t(dados_gen))) #transformando em tbl 
+
 
 ##vamos remover colunas que sao todas 0 
 ind <- sapply(dados_gen, function(x) sum(x == 0)) != nrow(dados_gen)
@@ -345,7 +346,8 @@ EM_result_gen <- GMM_EM(eps = 1e-8, nrep = 100, Y = dados_gen, t0 = x1, weights0
 theta_EM_gen <- EM_result_gen[[1]] #estimação dos parâmetros 
 head(theta_EM_gen[,3])
 
-pi_EM_gen <- EM_result_gen[[2]] #estimação dos pi's (a qual mistura pertence)
+pi_EM_gen <- EM_result_gen[[2]] #estimação dos pi's (a qual mistura cada nacionalidade pertence)
+head(pi_EM_gen)
 
 pesos_EM_gen <- EM_result_gen[[3]] #estimação dos pesos
 pesos_EM_gen
