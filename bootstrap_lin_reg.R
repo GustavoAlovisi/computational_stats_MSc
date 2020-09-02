@@ -52,3 +52,36 @@ hist(beta1b)
 
 quantile(beta0b, c(0.025, 0.975))
 quantile(beta1b, c(0.025, 0.975))
+
+
+###c) Utilize um teste de permutação para verificar H0: B1 = 0 
+#Note que sob H0, Y = Beta0 + e, ou seja, X nao tem efeito algum sob Y
+#Assim, podemos permutar os valores Yobs|Xobs e X nao deveria ter efeito algum em Y. 
+
+#Vamos estimar beta1^ 
+beta1hat <- coef(lm(Y ~ X))[2]
+
+#Agora, vamos permutar os dados e calcular a dist de Beta1^ sob H0 
+est_test <- numeric(5000) #B = 5000 permutações
+
+for (i in 1:5000){
+  Y_perm <- sample(Y)
+  est_test[i] <- coef(lm(Y_perm ~ X))[2]
+}
+
+#histograma da dist de beta1_perm em H0 
+hist(est_test,50)
+
+#vamos agora calcular o p-valor de H0 ter gerado o valor beta1^ = -1.15
+round(mean(est_test<=beta1hat),2)
+#ou seja, aproximadamente 0% das permutações geraram um valor tão ou mais extremo que beta1^ sob H0. 
+#assim, podemos rejeitar a 5% a hipótese que B1 = 0. 
+
+#quantile(est_test, c(0.025, 0.975))
+
+###d) Este teste pode ser usado para testar B0 = 0 ?
+#Não, ele faz sentido para B1 pois ao setar B1 = 0 temos um efeito na relação entre X e Y: X nao afeta Y e assim podemos testar se isto é verdade.
+#Porém ao setar B0 = 0, Y = Beta1*X + e
+#Ou seja, ainda temos o efeito entre as variáveis presente. 
+#Assim, gerar valores permutados nesta distribuição não iria ser significativo para Beta0. 
+
