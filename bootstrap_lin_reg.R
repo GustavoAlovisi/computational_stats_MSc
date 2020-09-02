@@ -71,6 +71,7 @@ for (i in 1:5000){
 
 #histograma da dist de beta1_perm em H0 
 hist(est_test,50)
+abline(v = beta1hat)
 
 #vamos agora calcular o p-valor de H0 ter gerado o valor beta1^ = -1.15
 round(mean(est_test<=beta1hat),2)
