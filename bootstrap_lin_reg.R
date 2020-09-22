@@ -50,7 +50,7 @@ car::Confint(bootm, level=0.95, type="perc")
 
 
 
-#####b) Assumindo X dado e erro ~ N(0, sigma²) utilize bootstrap parametrico p/ obter as mesmas estimativas
+#####b) Assumindo X dado e erro ~ N(0, sigma²) utilize bootstrap paramétrico p/ obter as mesmas estimativas
 
 #Queremos estimar sigma do erro ~ N(0, sigma²) 
 
@@ -78,7 +78,7 @@ quantile(beta1b, c(0.025, 0.975)) #IC para beta1 boot parametrico
 #        2.5%      97.5%  
 #  -1.5495476 -0.7627046
 
-##podemos notar que o bootstrap parametrico produziu estimativas próximas ao bootstrap não parametrico. 
+##podemos notar que o bootstrap paramétrico produziu estimativas próximas ao bootstrap não paramétrico. 
 
 
 
