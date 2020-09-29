@@ -58,8 +58,10 @@ X <- MCMC_d[1,]*100 + MCMC_d[2,]*10 + MCMC_d[3,]
 hist(X,nclass=100)                         ## Olhar a distribuição de X
 hist(X,nclass=500)
 mean(X,na.rm=T)
-sd(X,na.rm=T)
+#[1] 709.9659
 
+sd(X,na.rm=T)
+#[1] 234.4805
 
 library(coda)
 MCMC_coda <- rbind(MCMC_d, MCMC_d[1,]*100+MCMC_d[2,]*10+MCMC_d[3,] ,(MCMC_d[1,]+MCMC_d[2,]+MCMC_d[3,])^5)
@@ -68,7 +70,7 @@ row.names(MCMC_coda) <- c("centena","dezena","unidade","valor x","f(x)")
 #a <- is.na(MCMC_d)
 x <- coda::mcmc(t(MCMC_coda))   #cria elemento coda.mcmc
 summary(x, na.rm = TRUE)
-plot(x)
+plot(x) 
 
 accept_rate <- 1 - coda::rejectionRate(x)
 accept_rate
@@ -78,7 +80,7 @@ coda::autocorr.plot(x) #para a centena, dezena, unidade, x e f(x)
 
 
 
-########Problema de lista: 
+########Problema da lista: 
 ########P(x) ~ (x[1]+x[2]+x[3]+x[4]+x[5])^5 para x = (00000, 00001, ..., 99999)
 
 #vamos definir a função proporcional a densidade que queremos amostrar
@@ -86,14 +88,20 @@ funcao_p <- function(x){      ## função proporcional a densidade que queremos 
   (x[1]+x[2]+x[3]+x[4]+x[5])^(5)
 }
 
+##rodando o MH 
 MCMC_d <- run_MCMC(n_MCMC = 2500, c(0,0,0,0,0), proposta = proposta, prob_aceita = prob_aceita, funcao_p = funcao_p)
 
 X <- MCMC_d[1,]*10000 + MCMC_d[2,]*1000 + 100*MCMC_d[3,] + 10*MCMC_d[4,] + MCMC_d[5,]
 hist(X,nclass=100)                         ## Olhar a distribuição de X
 hist(X,nclass=500)
-mean(X,na.rm=T)
-sd(X,na.rm=T)
+mean(X,na.rm=T) #media de X
+#[1] 66581.37
 
+sd(X,na.rm=T) #desvio de X
+#[1] 25677.71
+
+
+###Analise do tamanho amostral efetivo:
 MCMC_coda <- NULL
 MCMC_coda <- rbind(MCMC_d,MCMC_d[1,]*10000 + MCMC_d[2,]*1000 + 100*MCMC_d[3,] + 10*MCMC_d[4,] + MCMC_d[5,],
                    (MCMC_d[1,]+MCMC_d[2,]+MCMC_d[3,]+MCMC_d[4,]+MCMC_d[5,])^5)
@@ -103,7 +111,6 @@ row.names(MCMC_coda) <- c("10k","1k","centena","dezena","unidade",'x','f(x)')
 #a <- is.na(MCMC_d)
 x <- coda::mcmc(t(MCMC_coda))   #cria elemento coda.mcmc
 summary(x, na.rm = TRUE)
-plot(x)
 
 accept_rate <- 1 - coda::rejectionRate(x)
 accept_rate
@@ -111,4 +118,10 @@ accept_rate
 coda::effectiveSize(x) #entre 2000-3000 iterações são necessárias para gerar um tamanho efetivo de ~200 para 
 coda::autocorr.plot(x) #10k, 1k, centena, dezena e unidade.
 #neste caso, foram necessárias mais iterações do que no problema original. 
+ 
+#10k       1k  centena   dezena  unidade        x     f(x) 
+#236.5231 294.1065 234.6794 235.9561 290.4770 252.4362 397.9397 
+
+
+
 
