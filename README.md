@@ -1,7 +1,7 @@
 ## computational_stats_MSc
-# This is a repo for graduate Computational Statistics problem sets and class information/data. 
+## This is a repo for graduate Computational Statistics problem sets and class information/data. 
 
-It includes my codes for topics as 
+It includes my codes for topics as:
 - Fitting k-means clustering by minimizing variance/objective function
 - General Stats Optimization topics such as maximization of different likelihood functions: non-linear, constrained, block relaxtion ones, etc
 - Expectation Maximization Algorithm for a mixture of Multivariate Gaussians
