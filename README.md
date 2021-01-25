@@ -1,5 +1,5 @@
 ## computational_stats_MSc
-#This is a repo for graduate Computational Statistics problem sets and class information/data. 
+# This is a repo for graduate Computational Statistics problem sets and class information/data. 
 
 It includes my codes for topics as 
 - Fitting k-means clustering by minimizing variance/objective function
@@ -10,5 +10,5 @@ It includes my codes for topics as
 - Markov-Chain Monte Carlo for bayesian stats: Metropolis-Hastings and Gibbs-Sampler for bayesian regression
 - Hidden Markov Chains applied to finance 
 - Some linear algebra topics
-- Course Final Work: I've used an Sequential Quadratic Programming method for optimizing mixture copula parameters instead of classical EM algos. To assess performance i've conducted some Monte Carlo expectation and s.d. estimation of a simulated mixture. Used the proposed optimization to financial portfolio optimization problem. 
+- Course Final Work: I've used a Sequential Quadratic Programming (SQP) method for optimizing mixture copula parameters instead of classical EM algos. To assess performance I've conducted a Monte Carlo expectation and s.d. estimation of a simulated mixture. Used the proposed optimization method to a financial portfolio optimization problem. 
 
